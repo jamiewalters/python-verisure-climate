@@ -28,7 +28,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 
 
 class HeatPump(ClimateDevice):
-    """Representation of a demo climate device."""
+    """Representation of a verisure heatpump."""
 
     def __init__(self, heatpumpid):
         """Initialize the climate device."""
@@ -119,24 +119,24 @@ class HeatPump(ClimateDevice):
         """Set new target temperatures."""
         if kwargs.get(ATTR_TEMPERATURE) is not None:
             self._target_temperature = kwargs.get(ATTR_TEMPERATURE)
-            self.session.set_heat_pump_target_temperature(self.id, self._target_temperature)
+            session.set_heat_pump_target_temperature(self.id, self._target_temperature)
         self.schedule_update_ha_state()
 
     def set_swing_mode(self, swing_mode):
         """Set new swing setting."""
-        self.session.set_heat_pump_airswingdirection(self.id, swing_mode)
+        session.set_heat_pump_airswingdirection(self.id, swing_mode)
         self._current_swing_mode = swing_mode
         self.schedule_update_ha_state()
 
     def set_fan_mode(self, fan_mode):
         """Set new target temperature."""
-        self.session.set_heat_pump_fan_speed(self.id, fan_mode)
+        session.set_heat_pump_fan_speed(self.id, fan_mode)
         self._current_fan_mode = fan_mode
         self.schedule_update_ha_state()
 
     def set_operation_mode(self, operation_mode):
         """Set new target temperature."""
-        self.session.set_heat_pump_mode(self.id, operation_mode)
+        session.set_heat_pump_mode(self.id, operation_mode)
         self._current_operation = operation_mode
         self.schedule_update_ha_state()
 
@@ -153,16 +153,16 @@ class HeatPump(ClimateDevice):
 
     def turn_on(self):
         """Turn on."""
-        self.session.set_heat_pump_power(self.id, 'ON')
+        session.set_heat_pump_power(self.id, 'ON')
         self._on = True
         self.schedule_update_ha_state()
 
     def turn_off(self):
         """Turn off."""
-        self.session.set_heat_pump_power(self.id, 'OFF')
+        session.set_heat_pump_power(self.id, 'OFF')
         self._on = False
         self.schedule_update_ha_state()
 
     @Throttle(timedelta(seconds=5))
     def update(self):
-        self.state = self.session.get_heat_pump_state(self.id)
+        self.state = session.get_heat_pump_state(self.id)
