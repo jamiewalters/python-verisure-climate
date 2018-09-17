@@ -3,6 +3,9 @@
 1. Copy the files in to custom_components
 2. Edit verisureclimate.py to add your credentials
 3. Add verisureclimate to HASS configuration
+    <pre>climate:
+      - platform: verisureclimate
+    </pre>
 4. Restart HASS
 
 
