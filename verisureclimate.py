@@ -117,6 +117,10 @@ class HeatPump(ClimateDevice):
     def name(self):
         """Return the name of the climate device."""
         return self._name
+    
+    @property
+    def target_temperature_step(self):
+        return 1.0
 
     @property
     def temperature_unit(self):
