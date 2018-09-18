@@ -1,54 +1,107 @@
+
+import voluptuous as vol
+import logging
+import jsonpath
+import dateutil.parser
+import homeassistant.helpers.config_validation as cv
 from homeassistant.components.climate import (
     ClimateDevice,
     SUPPORT_TARGET_TEMPERATURE, SUPPORT_FAN_MODE,
     SUPPORT_OPERATION_MODE, SUPPORT_SWING_MODE,
-    SUPPORT_ON_OFF)
+    SUPPORT_ON_OFF, PLATFORM_SCHEMA)
 from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE
-from homeassistant.util import Throttle
 from datetime import timedelta
-import logging
 from .verisure import Session
-import jsonpath
+from homeassistant.helpers.event import track_time_interval
 
 jsonpath = jsonpath.jsonpath
-session = Session('username', 'password')
+SCAN_INTERVAL = timedelta(seconds=60)
 _LOGGER = logging.getLogger(__name__)
+heat_pumps = None
+
+VERISIRE_HASS_OP_MODE = {
+    'AUTO': 'auto',
+    'FAN': 'fan_only',
+    'COOL': 'cool',
+    'DRY': 'dry',
+    'HEAT': 'heat'
+}
+
+HASS_VERISURE_OP_MODE = {
+    'auto': 'AUTO',
+    'fan_only': 'FAN',
+    'cool': 'COOL',
+    'dry': 'DRY',
+    'heat': 'HEAT'
+}
+
+CONF_USERNAME = 'username'
+CONF_PASSWORD = 'password'
+
+PLATFORM_SCHEMA.extend({
+    vol.Required(CONF_USERNAME): cv.string,
+    vol.Optional(CONF_PASSWORD): cv.string,
+})
+
+
+def refresh(event_time):
+    global heat_pumps
+    heat_pumps = jsonpath(session.get_overview(), '$.heatPumps')
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
-    """Set up the Demo climate devices."""
+    global session
+    configs = []
+    if (discovery_info):
+        configs = [PLATFORM_SCHEMA(x) for x in discovery_info]
+    else:
+        configs = [config]
+
+    for c in configs:
+        username = c.get(CONF_USERNAME)
+        password = c.get(CONF_PASSWORD)
+
+    session = Session(username, password)
+    track_time_interval(hass, refresh, SCAN_INTERVAL)
     session.login()
+    global heat_pumps
     heat_pumps = jsonpath(session.get_overview(), '$.heatPumps')
     for heat_pump in heat_pumps:
         device_label = jsonpath(heat_pump[0], '$.deviceLabel')[0]
-        _LOGGER.debug(device_label)
         add_entities([
             HeatPump(device_label)
         ])
 
 
 class HeatPump(ClimateDevice):
-    """Representation of a verisure heatpump."""
+    """Representation of a demo climate device."""
 
     def __init__(self, heatpumpid):
         """Initialize the climate device."""
-
         self.id = heatpumpid
-        self.heatpumpstate = session.get_heat_pump_state(self.id)
-
-        self._name = jsonpath(self.heatpumpstate, '$.area')[0]
         self._support_flags = SUPPORT_TARGET_TEMPERATURE | SUPPORT_FAN_MODE |\
             SUPPORT_OPERATION_MODE | SUPPORT_ON_OFF | SUPPORT_SWING_MODE
-        self._target_temperature = jsonpath(self.heatpumpstate, '$.heatPumpConfig.targetTemperature')[0]
         self._unit_of_measurement = TEMP_CELSIUS
-        self._current_temperature = jsonpath(self.heatpumpstate, '$.latestClimateSample.temperature')[0]
-        self._current_fan_mode = jsonpath(self.heatpumpstate, '$.heatPumpConfig.fanSpeed')[0]
-        self._current_operation = jsonpath(self.heatpumpstate, '$.heatPumpConfig.mode')[0]
-        self._current_swing_mode = jsonpath(self.heatpumpstate, '$.heatPumpConfig.airSwingDirection.vertical')[0]
-        self._fan_list = ['AUTO', 'LOW', 'MEDIUM_LOW', 'MEDIUM', 'MEDIUM_HIGH', 'HIGH']
-        self._operation_list = ['HEAT', 'COOL', 'FAN', 'AUTO', 'DRY']
-        self._swing_list = ['AUTO', '0_DEGREES', '30_DEGREES', '60_DEGREES', '90_DEGREES']
-        self._on = True if jsonpath(self.heatpumpstate, '$.heatPumpConfig.power')[0] == 'ON' else False
+        self._fan_list = ['Auto', 'Low', 'Medium_Low', 'Medium', 'Medium_High', 'High']
+        self._operation_list = ['heat', 'cool', 'auto', 'dry', 'fan_only']
+        self._swing_list = ['Auto', '0_Degrees', '30_Degrees', '60_Degrees', '90_Degrees']
+        self._config_date = None
+        self.sync_data()
+
+    def sync_data(self):
+        self.heatpumpstate = jsonpath(heat_pumps, '$.[?(@.deviceLabel == \'' + self.id + '\')]')[0]
+        self._name = jsonpath(self.heatpumpstate, '$.area')[0]
+        d = dateutil.parser.parse(jsonpath(self.heatpumpstate, '$.heatPumpConfig.changedTime')[0])
+
+        if self._config_date is None or self._config_date < d:
+            self._target_temperature = jsonpath(self.heatpumpstate, '$.heatPumpConfig.targetTemperature')[0]
+            self._current_temperature = jsonpath(self.heatpumpstate, '$.latestClimateSample.temperature')[0]
+            current_operation = jsonpath(self.heatpumpstate, '$.heatPumpConfig.mode')[0]
+            self._current_operation = VERISIRE_HASS_OP_MODE[current_operation]
+            self._current_fan_mode = jsonpath(self.heatpumpstate, '$.heatPumpConfig.fanSpeed')[0].title()
+            self._current_swing_mode = jsonpath(self.heatpumpstate, '$.heatPumpConfig.airSwingDirection.vertical')[0].title()
+            self._on = True if jsonpath(self.heatpumpstate, '$.heatPumpConfig.power')[0] == 'ON' else False
+            self._config_date = d
 
     @property
     def supported_features(self):
@@ -58,7 +111,7 @@ class HeatPump(ClimateDevice):
     @property
     def should_poll(self):
         """Return the polling state."""
-        return False
+        return True
 
     @property
     def name(self):
@@ -73,19 +126,16 @@ class HeatPump(ClimateDevice):
     @property
     def current_temperature(self):
         """Return the current temperature."""
-        self._current_temperature = jsonpath(self.heatpumpstate, '$.latestClimateSample.temperature')[0]
         return self._current_temperature
 
     @property
     def target_temperature(self):
-        """Return the temperature we try to reach."""
-        self._target_temperature = jsonpath(self.heatpumpstate, '$.heatPumpConfig.targetTemperature')[0]
+        """Return the temperature we try to reach."""       
         return self._target_temperature
 
     @property
     def current_operation(self):
         """Return current operation ie. heat, cool, idle."""
-        self._current_operation = jsonpath(self.heatpumpstate, '$.heatPumpConfig.mode')[0]
         return self._current_operation
 
     @property
@@ -96,18 +146,11 @@ class HeatPump(ClimateDevice):
     @property
     def is_on(self):
         """Return true if the device is on."""
-        on_state = jsonpath(self.heatpumpstate, '$.heatPumpConfig.power')[0]
-        if on_state == 'ON':
-            self._on = True
-        else:
-            self._on = False
-
         return self._on
 
     @property
     def current_fan_mode(self):
         """Return the fan setting."""
-        self._current_fan_mode = jsonpath(self.heatpumpstate, '$.heatPumpConfig.fanSpeed')[0]
         return self._current_fan_mode
 
     @property
@@ -118,32 +161,32 @@ class HeatPump(ClimateDevice):
     def set_temperature(self, **kwargs):
         """Set new target temperatures."""
         if kwargs.get(ATTR_TEMPERATURE) is not None:
-            self._target_temperature = kwargs.get(ATTR_TEMPERATURE)
-            session.set_heat_pump_target_temperature(self.id, self._target_temperature)
+            self._target_temperature = kwargs.get(ATTR_TEMPERATURE)           
+        session.set_heat_pump_target_temperature(self.id, self._target_temperature)
         self.schedule_update_ha_state()
 
     def set_swing_mode(self, swing_mode):
         """Set new swing setting."""
-        session.set_heat_pump_airswingdirection(self.id, swing_mode)
+        session.set_heat_pump_airswingdirection(self.id, swing_mode.upper())
         self._current_swing_mode = swing_mode
         self.schedule_update_ha_state()
 
     def set_fan_mode(self, fan_mode):
         """Set new target temperature."""
-        session.set_heat_pump_fan_speed(self.id, fan_mode)
+        session.set_heat_pump_fan_speed(self.id, fan_mode.upper())
         self._current_fan_mode = fan_mode
         self.schedule_update_ha_state()
 
     def set_operation_mode(self, operation_mode):
         """Set new target temperature."""
-        session.set_heat_pump_mode(self.id, operation_mode)
+        session.set_heat_pump_mode(self.id, 
+                                   HASS_VERISURE_OP_MODE[operation_mode])
         self._current_operation = operation_mode
         self.schedule_update_ha_state()
 
     @property
     def current_swing_mode(self):
         """Return the swing setting."""
-        self._current_swing_mode = jsonpath(self.heatpumpstate, '$.heatPumpConfig.airSwingDirection.vertical')[0]
         return self._current_swing_mode
 
     @property
@@ -163,6 +206,6 @@ class HeatPump(ClimateDevice):
         self._on = False
         self.schedule_update_ha_state()
 
-    @Throttle(timedelta(seconds=5))
     def update(self):
-        self.state = session.get_heat_pump_state(self.id)
+        self.sync_data()
+        self.schedule_update_ha_state()
