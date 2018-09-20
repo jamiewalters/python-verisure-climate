@@ -11,7 +11,7 @@ from homeassistant.components.climate import (
     SUPPORT_ON_OFF, PLATFORM_SCHEMA)
 from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE
 from datetime import timedelta
-from .verisure import Session
+from .verisure import Session, ResponseError
 from homeassistant.helpers.event import track_time_interval
 
 jsonpath = jsonpath.jsonpath
@@ -44,14 +44,24 @@ PLATFORM_SCHEMA.extend({
 })
 
 
-def fetch_data(event_time):
+def update_overview(event_time):
+    """Update the overview."""
     global heat_pumps
-    session.login()
-    heat_pumps = jsonpath(session.get_overview(), '$.heatPumps')
+    try:
+        heat_pumps = jsonpath(session.get_overview(), '$.heatPumps')
+    except ResponseError as ex:
+        _LOGGER.error('Could not read overview, %s', ex)
+        if ex.status_code == 503:  # Service unavailable
+            _LOGGER.info('Trying to log in again')
+            session.login()
+        else:
+            raise
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
     global session
+    global heat_pumps
+    
     configs = []
     if (discovery_info):
         configs = [PLATFORM_SCHEMA(x) for x in discovery_info]
@@ -63,8 +73,10 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
         password = c.get(CONF_PASSWORD)
     
     session = Session(username, password)
-    track_time_interval(hass, fetch_data, SCAN_INTERVAL)
-    fetch_data()
+    session.login()
+    heat_pumps = jsonpath(session.get_overview(), '$.heatPumps')
+    track_time_interval(hass, update_overview, SCAN_INTERVAL)
+
     for heat_pump in heat_pumps:
         device_label = jsonpath(heat_pump[0], '$.deviceLabel')[0]
         add_entities([
