@@ -92,10 +92,10 @@ class HeatPump(ClimateDevice):
         self.heatpumpstate = jsonpath(heat_pumps, '$.[?(@.deviceLabel == \'' + self.id + '\')]')[0]
         self._name = jsonpath(self.heatpumpstate, '$.area')[0]
         d = dateutil.parser.parse(jsonpath(self.heatpumpstate, '$.heatPumpConfig.changedTime')[0])
+        self._current_temperature = jsonpath(self.heatpumpstate, '$.latestClimateSample.temperature')[0]
 
         if self._config_date is None or self._config_date < d:
             self._target_temperature = jsonpath(self.heatpumpstate, '$.heatPumpConfig.targetTemperature')[0]
-            self._current_temperature = jsonpath(self.heatpumpstate, '$.latestClimateSample.temperature')[0]
             current_operation = jsonpath(self.heatpumpstate, '$.heatPumpConfig.mode')[0]
             self._current_operation = VERISIRE_HASS_OP_MODE[current_operation]
             self._current_fan_mode = jsonpath(self.heatpumpstate, '$.heatPumpConfig.fanSpeed')[0].title()
