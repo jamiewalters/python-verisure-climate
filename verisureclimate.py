@@ -44,8 +44,9 @@ PLATFORM_SCHEMA.extend({
 })
 
 
-def refresh(event_time):
+def fetch_data(event_time):
     global heat_pumps
+    session.login()
     heat_pumps = jsonpath(session.get_overview(), '$.heatPumps')
 
 
@@ -60,12 +61,10 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     for c in configs:
         username = c.get(CONF_USERNAME)
         password = c.get(CONF_PASSWORD)
-
+    
     session = Session(username, password)
-    track_time_interval(hass, refresh, SCAN_INTERVAL)
-    session.login()
-    global heat_pumps
-    heat_pumps = jsonpath(session.get_overview(), '$.heatPumps')
+    track_time_interval(hass, fetch_data, SCAN_INTERVAL)
+    fetch_data()
     for heat_pump in heat_pumps:
         device_label = jsonpath(heat_pump[0], '$.deviceLabel')[0]
         add_entities([
