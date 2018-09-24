@@ -48,7 +48,7 @@ def update_overview(event_time):
     """Update the overview."""
     global heat_pumps
     try:
-        heat_pumps = jsonpath(session.get_overview(), '$.heatPumps')
+        heat_pumps = jsonpath(session.get_overview(), '$.heatPumps')[0]
     except ResponseError as ex:
         _LOGGER.error('Could not read overview, %s', ex)
         if ex.status_code == 503:  # Service unavailable
@@ -61,7 +61,7 @@ def update_overview(event_time):
 def setup_platform(hass, config, add_entities, discovery_info=None):
     global session
     global heat_pumps
-    
+
     configs = []
     if (discovery_info):
         configs = [PLATFORM_SCHEMA(x) for x in discovery_info]
@@ -71,14 +71,14 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     for c in configs:
         username = c.get(CONF_USERNAME)
         password = c.get(CONF_PASSWORD)
-    
+
     session = Session(username, password)
     session.login()
-    heat_pumps = jsonpath(session.get_overview(), '$.heatPumps')
+    heat_pumps = jsonpath(session.get_overview(), '$.heatPumps')[0]
     track_time_interval(hass, update_overview, SCAN_INTERVAL)
 
     for heat_pump in heat_pumps:
-        device_label = jsonpath(heat_pump[0], '$.deviceLabel')[0]
+        device_label = jsonpath(heat_pump, '$.deviceLabel')[0]
         add_entities([
             HeatPump(device_label)
         ])
@@ -128,7 +128,7 @@ class HeatPump(ClimateDevice):
     def name(self):
         """Return the name of the climate device."""
         return self._name
-    
+
     @property
     def target_temperature_step(self):
         return 1.0
@@ -145,7 +145,7 @@ class HeatPump(ClimateDevice):
 
     @property
     def target_temperature(self):
-        """Return the temperature we try to reach."""       
+        """Return the temperature we try to reach."""
         return self._target_temperature
 
     @property
@@ -175,28 +175,32 @@ class HeatPump(ClimateDevice):
 
     def set_temperature(self, **kwargs):
         """Set new target temperatures."""
-        if kwargs.get(ATTR_TEMPERATURE) is not None:
-            self._target_temperature = kwargs.get(ATTR_TEMPERATURE)           
-        session.set_heat_pump_target_temperature(self.id, self._target_temperature)
+        if self._on:
+            if kwargs.get(ATTR_TEMPERATURE) is not None:
+                self._target_temperature = kwargs.get(ATTR_TEMPERATURE)
+                session.set_heat_pump_target_temperature(self.id, self._target_temperature)
         self.schedule_update_ha_state()
 
     def set_swing_mode(self, swing_mode):
         """Set new swing setting."""
-        session.set_heat_pump_airswingdirection(self.id, swing_mode.upper())
-        self._current_swing_mode = swing_mode
+        if self._on:
+            session.set_heat_pump_airswingdirection(self.id, swing_mode.upper())
+            self._current_swing_mode = swing_mode
         self.schedule_update_ha_state()
 
     def set_fan_mode(self, fan_mode):
         """Set new target temperature."""
-        session.set_heat_pump_fan_speed(self.id, fan_mode.upper())
-        self._current_fan_mode = fan_mode
+        if self._on:
+            session.set_heat_pump_fan_speed(self.id, fan_mode.upper())
+            self._current_fan_mode = fan_mode
         self.schedule_update_ha_state()
 
     def set_operation_mode(self, operation_mode):
         """Set new target temperature."""
-        session.set_heat_pump_mode(self.id, 
-                                   HASS_VERISURE_OP_MODE[operation_mode])
-        self._current_operation = operation_mode
+        if self._on:
+            session.set_heat_pump_mode(self.id,
+                                       HASS_VERISURE_OP_MODE[operation_mode])
+            self._current_operation = operation_mode
         self.schedule_update_ha_state()
 
     @property
