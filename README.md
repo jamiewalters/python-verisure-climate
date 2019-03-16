@@ -7,7 +7,7 @@ This is based on the vsure python lib developed at: https://github.com/persandst
 
 To install this component:
 
-- Copy the files in this repository to your /config/custom_components/climate
+- Copy the files in this repository to your /config/custom_components/verisureclimate
 - Add verisureclimate to HASS configuration as shown:
     <pre>climate:
       - platform: verisureclimate

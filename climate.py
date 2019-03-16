@@ -6,9 +6,11 @@ import dateutil.parser
 import homeassistant.helpers.config_validation as cv
 from homeassistant.components.climate import (
     ClimateDevice,
-    SUPPORT_TARGET_TEMPERATURE, SUPPORT_FAN_MODE,
-    SUPPORT_OPERATION_MODE, SUPPORT_SWING_MODE,
-    SUPPORT_ON_OFF, PLATFORM_SCHEMA)
+    PLATFORM_SCHEMA)
+from homeassistant.components.climate.const import (
+    SUPPORT_TARGET_TEMPERATURE, 
+    SUPPORT_FAN_MODE, SUPPORT_OPERATION_MODE, 
+    SUPPORT_SWING_MODE, SUPPORT_ON_OFF)    
 from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE
 from datetime import timedelta
 from .verisure import Session, ResponseError
