@@ -36,7 +36,7 @@ HA_STATE_TO_VERISURE = {
     HVAC_MODE_FAN_ONLY: "fan",
     HVAC_MODE_DRY: "dry",
     HVAC_MODE_COOL: "cool",
-    HVAC_MODE_HEAT: "hot",
+    HVAC_MODE_HEAT: "heat",
     HVAC_MODE_HEAT_COOL: "auto",
     HVAC_MODE_OFF: "off",
 }
@@ -45,7 +45,7 @@ VERISURE_TO_HA_STATE = {
     "fan": HVAC_MODE_FAN_ONLY,
     "dry": HVAC_MODE_DRY,
     "cool": HVAC_MODE_COOL,
-    "hot": HVAC_MODE_HEAT,
+    "heat": HVAC_MODE_HEAT,
     "auto": HVAC_MODE_HEAT_COOL,
     "off": HVAC_MODE_OFF,
 }
