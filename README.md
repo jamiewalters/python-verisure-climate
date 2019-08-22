@@ -1,5 +1,3 @@
-NB! This component does not work as it should and is work under progress. Feel free to test it and if you are capable to sort out the problems you are more than welcome to help out.
-
 # Access Verisure HeatPumps in HomeAssistant
 
 After HA Climate 1.0-change refactoring work needs to be done.
