@@ -215,12 +215,13 @@ class HeatPump(ClimateDevice):
 
     def set_hvac_mode(self, hvac_mode):
         """Set new operation mode."""
+        if not self._on:
+            session.set_heat_pump_power(self.id, 'ON')
+            self._on = True
         if hvac_mode == HVAC_MODE_OFF:
             session.set_heat_pump_power(self.id, 'OFF')
             self._on = False
         else:
-            session.set_heat_pump_power(self.id, 'ON')
-            self._on = True
             session.set_heat_pump_mode(self.id,
                                        HA_STATE_TO_VERISURE[hvac_mode])
             self._hvac_mode = hvac_mode
