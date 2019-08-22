@@ -22,7 +22,8 @@ from homeassistant.components.climate.const import (
     SUPPORT_SWING_MODE,
     SUPPORT_TARGET_TEMPERATURE
 )
-from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE
+from homeassistant.const import (
+    TEMP_CELSIUS, ATTR_TEMPERATURE)
 from datetime import timedelta
 from .verisure import Session, ResponseError
 from homeassistant.helpers.event import track_time_interval
@@ -33,21 +34,21 @@ _LOGGER = logging.getLogger(__name__)
 heat_pumps = None
 
 HA_STATE_TO_VERISURE = {
-    HVAC_MODE_FAN_ONLY: "fan",
-    HVAC_MODE_DRY: "dry",
-    HVAC_MODE_COOL: "cool",
-    HVAC_MODE_HEAT: "heat",
-    HVAC_MODE_HEAT_COOL: "auto",
-    HVAC_MODE_OFF: "off",
+    "fan_only": "FAN",
+    "dry": "DRY",
+    "cool": "COOL",
+    "heat": "HEAT",
+    "auto": "AUTO",
+    "off": "OFF",
 }
 
 VERISURE_TO_HA_STATE = {
-    "fan": HVAC_MODE_FAN_ONLY,
-    "dry": HVAC_MODE_DRY,
-    "cool": HVAC_MODE_COOL,
-    "heat": HVAC_MODE_HEAT,
-    "auto": HVAC_MODE_HEAT_COOL,
-    "off": HVAC_MODE_OFF,
+    "FAN": HVAC_MODE_FAN_ONLY,
+    "DRY": HVAC_MODE_DRY,
+    "COOL": HVAC_MODE_COOL,
+    "HEAT": HVAC_MODE_HEAT,
+    "AUTO": HVAC_MODE_HEAT_COOL,
+    "OFF": HVAC_MODE_OFF,
 }
 
 CONF_USERNAME = 'username'
@@ -107,9 +108,9 @@ class HeatPump(ClimateDevice):
         self.id = heatpumpid
         self._support_flags = SUPPORT_TARGET_TEMPERATURE | SUPPORT_FAN_MODE | SUPPORT_SWING_MODE
         self._unit_of_measurement = TEMP_CELSIUS
-        self._fan_list = ['Auto', 'Low', 'Medium_Low', 'Medium', 'Medium_High', 'High']
-        self._operation_list = ['heat', 'cool', 'auto', 'dry', 'fan_only']
-        self._swing_list = ['Auto', '0_Degrees', '30_Degrees', '60_Degrees', '90_Degrees']
+        self._fan_modes = ['Auto', 'Low', 'Medium_Low', 'Medium', 'Medium_High', 'High']
+        self._hvac_modes = ['heat', 'cool', 'auto', 'dry', 'fan_only', 'off']
+        self._swing_modes = ['Auto', '0_Degrees', '30_Degrees', '60_Degrees', '90_Degrees']
         self._config_date = None
         self.sync_data()
 
@@ -124,7 +125,7 @@ class HeatPump(ClimateDevice):
             hvac_mode = jsonpath(self.heatpumpstate, '$.heatPumpConfig.mode')[0]
             self._on = True if jsonpath(self.heatpumpstate, '$.heatPumpConfig.power')[0] == 'ON' else False
             if self._on:
-                self._hvac_mode = HA_STATE_TO_VERISURE[hvac_mode]
+                self._hvac_mode = VERISURE_TO_HA_STATE[hvac_mode]
             else:
                 self._hvac_mode = HVAC_MODE_OFF
             self._fan_mode = jsonpath(self.heatpumpstate, '$.heatPumpConfig.fanSpeed')[0].title()
@@ -218,11 +219,11 @@ class HeatPump(ClimateDevice):
             session.set_heat_pump_power(self.id, 'OFF')
             self._on = False
         else:
-            session.set_heat_pump_mode(self.id,
-                                       VERISURE_TO_HA_STATE[hvac_mode])
-            self._hvac_mode = hvac_mode
             session.set_heat_pump_power(self.id, 'ON')
             self._on = True
+            session.set_heat_pump_mode(self.id,
+                                       HA_STATE_TO_VERISURE[hvac_mode])
+            self._hvac_mode = hvac_mode
         self.schedule_update_ha_state()
 
     @property
