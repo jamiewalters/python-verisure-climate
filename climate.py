@@ -53,7 +53,7 @@ VERISURE_TO_HA_STATE = {
 CONF_USERNAME = 'username'
 CONF_PASSWORD = 'password'
 
-PLATFORM_SCHEMA.extend({
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_USERNAME): cv.string,
     vol.Optional(CONF_PASSWORD): cv.string,
 })
