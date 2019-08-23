@@ -149,7 +149,7 @@ class HeatPump(ClimateDevice):
 
     @property
     def target_temperature_step(self):
-        return 1.0
+        return 0.5
 
     @property
     def temperature_unit(self):
