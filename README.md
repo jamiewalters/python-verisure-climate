@@ -1,6 +1,8 @@
 # Access Verisure HeatPumps in HomeAssistant
 
-This is a custom component for exposing heatpumps through Verisure as climate components in homeassistant.
+After HA Climate 1.0-change refactoring work had to be done.
+
+This is a custom component made by https://github.com/jamiewalters/ for exposing heatpumps through Verisure as climate components in homeassistant.
 This is based on the vsure python lib developed at: https://github.com/persandstrom/python-verisure
 
 ## Installation 

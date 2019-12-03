@@ -8,10 +8,22 @@ from homeassistant.components.climate import (
     ClimateDevice,
     PLATFORM_SCHEMA)
 from homeassistant.components.climate.const import (
-    SUPPORT_TARGET_TEMPERATURE, 
-    SUPPORT_FAN_MODE, SUPPORT_OPERATION_MODE, 
-    SUPPORT_SWING_MODE, SUPPORT_ON_OFF)    
-from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE
+    HVAC_MODE_COOL,
+    HVAC_MODE_DRY,
+    HVAC_MODE_FAN_ONLY,
+    HVAC_MODE_HEAT,
+    HVAC_MODE_HEAT_COOL,
+    HVAC_MODE_OFF,
+    ATTR_FAN_MODE,
+    ATTR_HVAC_MODE,
+    ATTR_PRESET_MODE,
+    ATTR_SWING_MODE,
+    SUPPORT_FAN_MODE,
+    SUPPORT_SWING_MODE,
+    SUPPORT_TARGET_TEMPERATURE
+)
+from homeassistant.const import (
+    TEMP_CELSIUS, ATTR_TEMPERATURE)
 from datetime import timedelta
 from .verisure import Session, ResponseError
 from homeassistant.helpers.event import track_time_interval
@@ -21,20 +33,22 @@ SCAN_INTERVAL = timedelta(seconds=60)
 _LOGGER = logging.getLogger(__name__)
 heat_pumps = None
 
-VERISIRE_HASS_OP_MODE = {
-    'AUTO': 'auto',
-    'FAN': 'fan_only',
-    'COOL': 'cool',
-    'DRY': 'dry',
-    'HEAT': 'heat'
+HA_STATE_TO_VERISURE = {
+    "fan_only": "FAN",
+    "dry": "DRY",
+    "cool": "COOL",
+    "heat": "HEAT",
+    "auto": "AUTO",
+    "off": "OFF",
 }
 
-HASS_VERISURE_OP_MODE = {
-    'auto': 'AUTO',
-    'fan_only': 'FAN',
-    'cool': 'COOL',
-    'dry': 'DRY',
-    'heat': 'HEAT'
+VERISURE_TO_HA_STATE = {
+    "FAN": HVAC_MODE_FAN_ONLY,
+    "DRY": HVAC_MODE_DRY,
+    "COOL": HVAC_MODE_COOL,
+    "HEAT": HVAC_MODE_HEAT,
+    "AUTO": HVAC_MODE_HEAT_COOL,
+    "OFF": HVAC_MODE_OFF,
 }
 
 CONF_USERNAME = 'username'
@@ -92,12 +106,11 @@ class HeatPump(ClimateDevice):
     def __init__(self, heatpumpid):
         """Initialize the climate device."""
         self.id = heatpumpid
-        self._support_flags = SUPPORT_TARGET_TEMPERATURE | SUPPORT_FAN_MODE |\
-            SUPPORT_OPERATION_MODE | SUPPORT_ON_OFF | SUPPORT_SWING_MODE
+        self._support_flags = SUPPORT_TARGET_TEMPERATURE | SUPPORT_FAN_MODE | SUPPORT_SWING_MODE
         self._unit_of_measurement = TEMP_CELSIUS
-        self._fan_list = ['Auto', 'Low', 'Medium_Low', 'Medium', 'Medium_High', 'High']
-        self._operation_list = ['heat', 'cool', 'auto', 'dry', 'fan_only']
-        self._swing_list = ['Auto', '0_Degrees', '30_Degrees', '60_Degrees', '90_Degrees']
+        self._fan_modes = ['Auto', 'Low', 'Medium_Low', 'Medium', 'Medium_High', 'High']
+        self._hvac_modes = ['heat', 'cool', 'auto', 'dry', 'fan_only', 'off']
+        self._swing_modes = ['Auto', '0_Degrees', '30_Degrees', '60_Degrees', '90_Degrees']
         self._config_date = None
         self.sync_data()
 
@@ -109,11 +122,14 @@ class HeatPump(ClimateDevice):
 
         if self._config_date is None or self._config_date < d:
             self._target_temperature = jsonpath(self.heatpumpstate, '$.heatPumpConfig.targetTemperature')[0]
-            current_operation = jsonpath(self.heatpumpstate, '$.heatPumpConfig.mode')[0]
-            self._current_operation = VERISIRE_HASS_OP_MODE[current_operation]
-            self._current_fan_mode = jsonpath(self.heatpumpstate, '$.heatPumpConfig.fanSpeed')[0].title()
-            self._current_swing_mode = jsonpath(self.heatpumpstate, '$.heatPumpConfig.airSwingDirection.vertical')[0].title()
+            hvac_mode = jsonpath(self.heatpumpstate, '$.heatPumpConfig.mode')[0]
             self._on = True if jsonpath(self.heatpumpstate, '$.heatPumpConfig.power')[0] == 'ON' else False
+            if self._on:
+                self._hvac_mode = VERISURE_TO_HA_STATE[hvac_mode]
+            else:
+                self._hvac_mode = HVAC_MODE_OFF
+            self._fan_mode = jsonpath(self.heatpumpstate, '$.heatPumpConfig.fanSpeed')[0].title()
+            self._swing_mode = jsonpath(self.heatpumpstate, '$.heatPumpConfig.airSwingDirection.vertical')[0].title()
             self._config_date = d
 
     @property
@@ -133,7 +149,7 @@ class HeatPump(ClimateDevice):
 
     @property
     def target_temperature_step(self):
-        return 1.0
+        return 0.5
 
     @property
     def temperature_unit(self):
@@ -151,14 +167,14 @@ class HeatPump(ClimateDevice):
         return self._target_temperature
 
     @property
-    def current_operation(self):
+    def hvac_mode(self):
         """Return current operation ie. heat, cool, idle."""
-        return self._current_operation
+        return self._hvac_mode
 
     @property
-    def operation_list(self):
+    def hvac_modes(self):
         """Return the list of available operation modes."""
-        return self._operation_list
+        return self._hvac_modes
 
     @property
     def is_on(self):
@@ -166,14 +182,14 @@ class HeatPump(ClimateDevice):
         return self._on
 
     @property
-    def current_fan_mode(self):
+    def fan_mode(self):
         """Return the fan setting."""
-        return self._current_fan_mode
+        return self._fan_mode
 
     @property
-    def fan_list(self):
+    def fan_modes(self):
         """Return the list of available fan modes."""
-        return self._fan_list
+        return self._fan_modes
 
     def set_temperature(self, **kwargs):
         """Set new target temperatures."""
@@ -187,45 +203,39 @@ class HeatPump(ClimateDevice):
         """Set new swing setting."""
         if self._on:
             session.set_heat_pump_airswingdirection(self.id, swing_mode.upper())
-            self._current_swing_mode = swing_mode
+            self._swing_mode = swing_mode
         self.schedule_update_ha_state()
 
     def set_fan_mode(self, fan_mode):
         """Set new target temperature."""
         if self._on:
             session.set_heat_pump_fan_speed(self.id, fan_mode.upper())
-            self._current_fan_mode = fan_mode
+            self._fan_mode = fan_mode
         self.schedule_update_ha_state()
 
-    def set_operation_mode(self, operation_mode):
-        """Set new target temperature."""
-        if self._on:
+    def set_hvac_mode(self, hvac_mode):
+        """Set new operation mode."""
+        if not self._on:
+            session.set_heat_pump_power(self.id, 'ON')
+            self._on = True
+        if hvac_mode == HVAC_MODE_OFF:
+            session.set_heat_pump_power(self.id, 'OFF')
+            self._on = False
+        else:
             session.set_heat_pump_mode(self.id,
-                                       HASS_VERISURE_OP_MODE[operation_mode])
-            self._current_operation = operation_mode
+                                       HA_STATE_TO_VERISURE[hvac_mode])
+            self._hvac_mode = hvac_mode
         self.schedule_update_ha_state()
 
     @property
-    def current_swing_mode(self):
+    def swing_mode(self):
         """Return the swing setting."""
-        return self._current_swing_mode
+        return self._swing_mode
 
     @property
-    def swing_list(self):
+    def swing_modes(self):
         """List of available swing modes."""
-        return self._swing_list
-
-    def turn_on(self):
-        """Turn on."""
-        session.set_heat_pump_power(self.id, 'ON')
-        self._on = True
-        self.schedule_update_ha_state()
-
-    def turn_off(self):
-        """Turn off."""
-        session.set_heat_pump_power(self.id, 'OFF')
-        self._on = False
-        self.schedule_update_ha_state()
+        return self._swing_modes
 
     def update(self):
         self.sync_data()
