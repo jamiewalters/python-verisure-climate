@@ -5,7 +5,7 @@ import jsonpath
 import dateutil.parser
 import homeassistant.helpers.config_validation as cv
 from homeassistant.components.climate import (
-    ClimateDevice,
+    ClimateEntity,
     PLATFORM_SCHEMA)
 from homeassistant.components.climate.const import (
     HVAC_MODE_COOL,
@@ -100,7 +100,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
         ])
 
 
-class HeatPump(ClimateDevice):
+class HeatPump(ClimateEntity):
     """Representation of a demo climate device."""
 
     def __init__(self, heatpumpid):
@@ -220,7 +220,6 @@ class HeatPump(ClimateDevice):
             self._on = True
         if hvac_mode == HVAC_MODE_OFF:
             session.set_heat_pump_power(self.id, 'OFF')
-            self._on = False
         else:
             session.set_heat_pump_mode(self.id,
                                        HA_STATE_TO_VERISURE[hvac_mode])

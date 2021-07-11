@@ -1,3 +1,5 @@
+This component is a fork from https://github.com/jamiewalters/python-verisure-climate. It seems like he is no longer active on this component, but there is an active pull-request waiting for him. For time beeing my version is the only active, and fully working, version of this custom component.
+
 # Access Verisure HeatPumps in HomeAssistant
 
 After HA Climate 1.0-change refactoring work had to be done.

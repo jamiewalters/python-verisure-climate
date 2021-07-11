@@ -56,7 +56,7 @@ class Session(object):
     """
 
     def __init__(self, username, password,
-                 cookieFileName='~/.verisure-cookie'):
+                 cookieFileName='~/.verisure-cookie_1'):
         self._username = username
         self._password = password
         self._cookieFileName = os.path.expanduser(cookieFileName)
@@ -532,7 +532,7 @@ class Session(object):
     def set_heat_pump_mode(self, device_label, mode):
         """ Set heatpump mode
         Args:
-            mode (str): 'HEAT', 'COOL', 'FAN' or 'AUTO'
+            mode (str): 'heat', 'cool', 'fan' or 'auto'
         """
         response = None
         try:
